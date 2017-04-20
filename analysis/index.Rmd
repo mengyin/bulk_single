@@ -7,7 +7,7 @@ output:
 
 The project is aiming at using general ASH to compare bulk RNA-seq data with single cell data. 
 
-*  [Bulk versus single cell data.](bulk_single.Rmd)
-*  [Use general ash to compare single cell datasets.](single_single.Rmd)
-*  [Unimodal prior versus trimodal prior.](trimodal.Rmd)
+*  [Bulk versus single cell data.](bulk_single.html)
+*  [Use general ash to compare single cell datasets.](single_single.html)
+*  [Unimodal prior versus trimodal prior.](trimodal.html)
 
