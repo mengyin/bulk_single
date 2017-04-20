@@ -1,0 +1,154 @@
+---
+title: "Use general ash to compare single cell datasets"
+author: "Mengyin Lu"
+date: 2016-04-15
+output: html_document
+---
+
+<!-- The file analysis/chunks.R contains chunks that define default settings
+shared across the workflowr files. -->
+```{r read-chunk, include=FALSE, cache=FALSE}
+knitr::read_chunk("chunks.R")
+```
+
+<!-- Update knitr chunk options -->
+```{r knitr-opts-chunk, include=FALSE}
+```
+
+<!-- Insert the date the file was last updated -->
+```{r last-updated, echo=FALSE, results='asis'}
+```
+
+<!-- Insert the code version (Git commit SHA1) if Git repository exists and R
+ package git2r is installed -->
+```{r code-version, echo=FALSE, results='asis'}
+```
+
+## Same individual, compare two replicates
+```{r,message=FALSE}
+library(tidyr)
+library(dplyr)
+
+# Data: individual NA19098, replicate 1 and 3
+load("../data/NA19098.sums.Rda") 
+
+# discard genes with 0 count
+counts_r1 = NA19098.sums[,1]
+counts_r3 = NA19098.sums[,2]
+counts = data.frame(counts_r1, counts_r3)
+counts = counts[which(rowSums(counts)>0),]
+head(counts)
+```
+
+Histogram of the ML estimates:
+```{r}
+library(ggplot2)
+ggplot(data.frame(mn = with(counts, counts_r1/(counts_r1 + counts_r3))),
+       aes(x = mn)) + geom_histogram(bins = 40) + labs(title="NA19098.r1 vs NA19098.r3")
+
+counts$mn <- with(counts, counts$counts_r1/(counts$counts_r1 + counts$counts_r3))
+```
+
+Compare ASH's posterior mean vs ML estimates:
+```{r,message=FALSE,warning=FALSE}
+library(ashr)
+ngenes = dim(counts)[1]
+fit_NA19098 <- ash.workhorse(rep(0, ngenes),1,
+                             lik = lik_binom(counts$counts_r1,
+                                             counts$counts_r1+counts$counts_r3), 
+                             mixcompdist = "halfuniform")
+
+counts %>% 
+  mutate(posterior_mean = fit_NA19098$result$PosteriorMean,
+         lfsr = fit_NA19098$result$lfsr) %>%
+  ggplot(aes(mn, posterior_mean)) +
+  geom_point(aes(colour = counts_r1), colour = "black") +
+  geom_vline(xintercept = .5, colour = "blue", lty = 3) + 
+  geom_hline(yintercept = .5, colour = "blue", lty = 2) +
+  geom_abline(intercept = 0, slope = 1, colour = "blue") +
+  labs(x = "ML estimate", y = "ASH Posterior mean",
+       title = "NA19098.r1 vs NA19098.r3") +
+  coord_fixed(ratio = 1) +
+  ylim(c(0,1))
+```
+
+ASH's fitted prior:
+```{r}
+# plot density of an unimix object g on x
+dens_unimix = function(g, x){
+  sapply(x, dens_unimix_sing, pi=g$pi, a=g$a, b=g$b)
+}
+
+dens_unimix_sing = function(x,pi,a,b){
+  sum((x>=a & x<=b)/(b-a)*pi,na.rm=TRUE)
+}
+
+x = seq(0,1,by=0.001)
+dens = dens_unimix(fit_NA19098$fitted_g, x)
+ggplot(data.frame(x,dens),aes(x, dens)) + 
+  geom_line() + 
+  geom_vline(xintercept=fit_NA19098$fitted_g$a[1],colour="blue") +
+  labs(x="", y="density", title="ASH fitted prior (NA19098.r1 vs NA19098.r3)")
+```
+
+## Two individuals
+```{r,message=FALSE}
+# Data: individual NA19098 replicate 1 and individual 19101 replicate 1
+load("../data/Two.ind.r1.Rda") 
+
+# discard genes with 0 count
+counts_NA19098 = Two.ind.r1[,1]
+counts_NA19101 = Two.ind.r1[,2]
+counts = data.frame(counts_NA19098, counts_NA19101)
+counts = counts[which(rowSums(counts)>0),]
+head(counts)
+```
+
+Histogram of the ML estimates:
+```{r}
+library(ggplot2)
+ggplot(data.frame(mn = with(counts, counts_NA19098/(counts_NA19098 + counts_NA19101))),
+       aes(x = mn)) + geom_histogram(bins = 40) + labs(title="NA19098.r1 vs NA19101.r1")
+
+counts$mn <- with(counts, 
+                  counts$counts_NA19098/(counts$counts_NA19098 + counts$counts_NA19101))
+```
+
+Compare ASH's posterior mean vs ML estimates:
+```{r,message=FALSE,warning=FALSE}
+library(ashr)
+ngenes = dim(counts)[1]
+fit_twoind <- ash.workhorse(rep(0, ngenes),1,
+                             lik = lik_binom(counts$counts_NA19098,
+                                             counts$counts_NA19098+counts$counts_NA19101), 
+                             mixcompdist = "halfuniform")
+
+counts %>% 
+  mutate(posterior_mean = fit_twoind$result$PosteriorMean,
+         lfsr = fit_twoind$result$lfsr) %>%
+  ggplot(aes(mn, posterior_mean)) +
+  geom_point(aes(colour = counts_NA19098), colour = "black") +
+  geom_vline(xintercept = .5, colour = "blue", lty = 3) + 
+  geom_hline(yintercept = .5, colour = "blue", lty = 2) +
+  geom_abline(intercept = 0, slope = 1, colour = "blue") +
+  labs(x = "ML estimate", y = "ASH Posterior mean",
+       title = "NA19098.r1 vs NA19101.r1") +
+  coord_fixed(ratio = 1) +
+  ylim(c(0,1))
+```
+
+ASH's fitted prior:
+```{r}
+x = seq(0,1,by=0.001)
+dens = dens_unimix(fit_twoind$fitted_g, x)
+ggplot(data.frame(x,dens),aes(x, dens)) + 
+  geom_line() + 
+  geom_vline(xintercept=fit_twoind$fitted_g$a[1],colour="blue") +
+  labs(x="", y="density", title="ASH fitted prior (NA19098.r1 vs NA19101.r1)")
+```
+
+## Session information
+
+<!-- Insert the session information into the document -->
+```{r session-info}
+```

@@ -5,11 +5,9 @@ output:
     toc: false
 ---
 
-The goal of this new template is to simplify the setup and maintenance of a research website.
-Specifically,
+The project is aiming at using general ASH to compare bulk RNA-seq data with single cell data. 
 
-*  Easier to build and extend the website using the new tools in the [rmarkdown][] package and [latest RStudio release][rstudio]
-*  Easier to deploy the website with Git and GitHub by only using one branch
+*  [Bulk versus single cell data.](bulk_single.Rmd)
+*  [Use general ash to compare single cell datasets.](single_single.Rmd)
+*  [Unimodal prior versus trimodal prior.](trimodal.Rmd)
 
-[rmarkdown]: http://rmarkdown.rstudio.com/rmarkdown_websites.htm
-[rstudio]: https://www.rstudio.com/products/rstudio/download/preview/

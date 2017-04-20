@@ -1,0 +1,195 @@
+---
+title: "Bulk versus single cell data"
+date: 2016-04-02
+output: html_document
+---
+
+<!-- The file analysis/chunks.R contains chunks that define default settings
+shared across the workflowr files. -->
+```{r read-chunk, include=FALSE, cache=FALSE}
+knitr::read_chunk("chunks.R")
+```
+
+<!-- Update knitr chunk options -->
+```{r knitr-opts-chunk, include=FALSE}
+```
+
+<!-- Insert the date the file was last updated -->
+```{r last-updated, echo=FALSE, results='asis'}
+```
+
+<!-- Insert the code version (Git commit SHA1) if Git repository exists and R
+ package git2r is installed -->
+```{r code-version, echo=FALSE, results='asis'}
+```
+
+## Outline
+
+The purpose of this document was to perform quantitative assessment of the difference between the counts of gene $g$ in single cell data and the counts of gene $g$ in bulk data. See [here](https://stephens999.github.io/singlecell-ideas/bulk-vs-single.html) for Matthew's formulation of the problem.
+
+The challenge here is that for each gene $g$, the total counts $C_g = X_g^s + X_g^b$ may be too big or too small by chance. We apply two approaches that can account for this uncertainty.
+
+
+## Data
+
+Loading packages.
+
+```{r}
+library(tidyr)
+library(dplyr)
+```
+
+Import the data before gene/sample filtering. (I copied these data files from our singleCellSeq project directory)
+
+```{r}
+anno <- read.table("../data/annotation.txt", header = TRUE,
+                   stringsAsFactors = FALSE)
+molecules <- read.table("../data/molecules.txt", header = TRUE,
+                    stringsAsFactors = FALSE)
+reads_bulk <- read.table("../data/reads-bulk.txt", header = TRUE, stringsAsFactors = FALSE)
+```
+
+Let's take one replicate for now. 
+
+```{r}
+molecules_19101_r1 <- molecules[ ,anno$batch == "NA19101.r1"]
+reads_bulk_19101_r1 <- reads_bulk[ ,grep("NA19101.r1", colnames(reads_bulk))]
+# Let's compute for the single cell data, the counts of gene $g$ across all the individual cells. 
+```
+
+Compute $X_g^{b}$ and $X_g^s$
+
+```{r}
+counts_single <- rowSums(molecules_19101_r1)
+counts_bulk <- reads_bulk_19101_r1
+
+all.equal(rownames(counts_bulk), rownames(counts_single))
+
+counts <- data.frame(counts_single, counts_bulk)
+counts <- counts[which(rowSums(counts)>0),]
+dim(counts)
+```
+
+## Method 1
+
+Here I follow the methods in this [blog post](http://varianceexplained.org/r/empirical_bayes_baseball/).
+
+
+Plot the ML estimate $\hat{p}_g = X_g^s / (X_g^s + X_g^b)$.
+
+```{r}
+library(ggplot2)
+ggplot(data.frame(mn = with(counts, counts_bulk/(counts_bulk + counts_single))),
+       aes(x = mn)) + geom_histogram(bins = 40)
+```
+
+Exclude the outliers to get estimate a beta prior.
+
+```{r}
+counts$mn <- with(counts, counts_bulk/(counts_bulk + counts_single))
+
+counts_filtered <- counts %>% 
+  filter(!(mn == 0 | mn == 1))
+```
+
+Use `optim` to find beta prior parameters.
+
+```{r}
+loglik <- function(mu, x) { 
+    sum(-dbeta(x,mu[1],mu[2],log = TRUE)) 
+    } 
+ 
+fit_optim <- optim(par = c(30,20), fn = loglik,
+                   x = counts_filtered$mn, 
+                   method = "L-BFGS-B", lower=c(0,0))
+fit_optim
+
+ggplot() +
+  geom_histogram(data = counts_filtered, aes(x = mn, y = ..density..), bins = 40) +
+  geom_density(data = data.frame(x = rbeta(100, fit_optim$par[1], fit_optim$par[2])), 
+               aes (x = x), color = "blue")
+```
+
+Compute posterior mean.
+
+```{r}
+alpha0 <- fit_optim$par[1]
+beta0 <- fit_optim$par[2]
+counts_eb <- counts_filtered %>%
+  mutate(eb_estimate = (counts_bulk + alpha0)/(counts_single + counts_bulk + alpha0 + beta0))
+```
+
+Plot estimates.
+
+```{r}
+counts_eb %>%
+  ggplot(aes(mn, eb_estimate)) +
+  geom_point(aes(colour = counts_bulk), colour = "black") +
+  geom_vline(xintercept = .5, colour = "blue", lty = 3) + 
+  geom_hline(yintercept = .5, colour = "blue", lty = 2) +
+  geom_abline(intercept = 0, slope = 1, colour = "blue") +
+  labs(x = "ML estimate", y = "Posterior mean",
+       title = "Beta prior, empirical bayes estimate") +
+  coord_fixed(ratio = 1)
+```
+
+
+## Method 2: Generlized ash
+
+Applying to filtered data
+
+```{r}
+ngenes <- dim(counts_filtered)[1]
+counts_filtered <- counts_filtered %>% 
+  mutate(total = counts_single + counts_bulk) %>% 
+  mutate(mn = counts_bulk/total) %>%
+  mutate(se = ngenes*mn*(1-mn))
+
+library(ashr)
+fit_ash_binom <- ash.workhorse(rep(0, ngenes), 
+                               1, 
+                               lik = lik_binom(counts_filtered$counts_bulk, 
+                                               counts_filtered$total),
+                               mixcompdist = "halfuniform")
+```
+
+
+Applying to unfiltered data
+
+```{r,eval=FALSE}
+ngenes <- dim(counts)[1]
+counts <- counts %>%
+  mutate(total = counts_single + counts_bulk) %>%
+  mutate(mn = counts_bulk/total) %>%
+  mutate(se = ngenes*mn*(1-mn))
+
+library(ashr)
+fit_ash_binom <- ash.workhorse(rep(0, ngenes),
+                               1,
+                               lik = lik_binom(counts$counts_bulk,
+                                               counts$total))
+summary(fit_ash_binom$result$PosteriorMean)
+```
+
+Plot estimates.
+
+```{r}
+counts_filtered %>% 
+  mutate(posterior_mean = fit_ash_binom$result$PosteriorMean,
+         lfsr = fit_ash_binom$result$lfsr) %>%
+  ggplot(aes(mn, posterior_mean)) +
+  geom_point(aes(colour = counts_bulk), colour = "black") +
+  geom_vline(xintercept = .5, colour = "blue", lty = 3) + 
+  geom_hline(yintercept = .5, colour = "blue", lty = 2) +
+  geom_abline(intercept = 0, slope = 1, colour = "blue") +
+  labs(x = "ML estimate", y = "Posterior mean",
+       title = "Beta prior, empirical bayes estimate") +
+  coord_fixed(ratio = 1)
+```
+
+
+## Session information
+
+<!-- Insert the session information into the document -->
+```{r session-info}
+```

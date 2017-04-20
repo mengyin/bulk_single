@@ -1,0 +1,242 @@
+---
+title: "Unimodal prior versus trimodal prior"
+author: "Mengyin Lu"
+date: 2016-04-15
+output: html_document
+---
+
+<!-- The file analysis/chunks.R contains chunks that define default settings
+shared across the workflowr files. -->
+```{r read-chunk, include=FALSE, cache=FALSE}
+knitr::read_chunk("chunks.R")
+```
+
+<!-- Update knitr chunk options -->
+```{r knitr-opts-chunk, include=FALSE}
+```
+
+<!-- Insert the date the file was last updated -->
+```{r last-updated, echo=FALSE, results='asis'}
+```
+
+<!-- Insert the code version (Git commit SHA1) if Git repository exists and R
+ package git2r is installed -->
+```{r code-version, echo=FALSE, results='asis'}
+```
+
+## Single cell data vs bulk data (NA19091.r1)
+
+```{r,echo=FALSE,message=FALSE}
+library(tidyr)
+library(dplyr)
+
+# plot density of an unimix object g on x
+dens_unimix = function(g, x){
+  sapply(x, dens_unimix_sing, pi=g$pi, a=g$a, b=g$b)
+}
+
+dens_unimix_sing = function(x,pi,a,b){
+  sum((x>=a & x<b)/(b-a)*pi,na.rm=TRUE)
+}
+```
+
+Import the data before gene/sample filtering. (I copied these data files from our singleCellSeq project directory)
+
+```{r}
+anno <- read.table("../data/annotation.txt", header = TRUE,stringsAsFactors = FALSE)
+molecules <- read.table("../data/molecules.txt", header = TRUE,stringsAsFactors = FALSE)
+reads_bulk <- read.table("../data/reads-bulk.txt", header = TRUE, stringsAsFactors = FALSE)
+
+molecules_19101_r1 <- molecules[ ,anno$batch == "NA19101.r1"]
+reads_bulk_19101_r1 <- reads_bulk[ ,grep("NA19101.r1", colnames(reads_bulk))]
+
+# Let's compute for the single cell data, the counts of gene $g$ across all the individual cells. 
+counts_single <- rowSums(molecules_19101_r1)
+counts_bulk <- reads_bulk_19101_r1
+
+counts <- data.frame(counts_single, counts_bulk)
+counts <- counts[which(rowSums(counts)>0),]
+
+ngenes <- dim(counts)[1]
+counts <- counts %>%
+  mutate(total = counts_single + counts_bulk) %>%
+  mutate(mn = counts_bulk/total)
+head(counts)
+```
+
+Applying general ash to unfiltered data. We try both unimodal prior and trimodal prior, where the trimodal prior contains the fitted unimodal prior's mixture components and pointmasses at 0 and 1. 
+
+```{r,message=FALSE,warning=FALSE}
+library(ashr)
+
+# fit unimodal ash
+fit_unimodal <- ash.workhorse(rep(0, ngenes), 1,
+                               lik = lik_binom(counts$counts_bulk,counts$total),
+                              mixcompdist = "halfuniform", prior="uniform")
+g_uni <- fit_unimodal$fitted_g
+
+# fit trimodal ash
+# trimodal prior's components: fitted unimodal prior's components and pointmasses at 0 & 1
+# use ash to estimate the mixture proportions
+g_tri <- g_uni
+g_tri$a <- c(0,1,g_tri$a)
+g_tri$b <- c(0,1,g_tri$b)
+g_tri$pi <- rep(1/length(g_tri$a), length(g_tri$a))
+fit_trimodal <- ash.workhorse(rep(0, ngenes), 1,
+                               lik = lik_binom(counts$counts_bulk,counts$total),
+                              g=g_tri, prior="uniform")
+g_tri <- fit_trimodal$fitted_g
+```
+
+
+Compare the fitted unimodal prior and trimodal prior:
+
+```{r}
+x <- seq(0,1,by=0.001)
+dens_uni <- dens_unimix(g_uni, x)
+pointmass_uni <- data.frame(point = g_uni$a[g_uni$a==g_uni$b],
+                        mass = g_uni$pi[g_uni$a==g_uni$b])
+
+dens_tri <- dens_unimix(g_tri, x)
+pointmass_tri <- data.frame(point = g_tri$a[g_tri$a==g_tri$b],
+                        mass = g_tri$pi[g_tri$a==g_tri$b])
+
+plot(x, dens_uni, type="l",ylim=c(0,10),xlab="",ylab="density",
+     main="ASH fitted prior (singlecell vs bulk)")
+lines(x, dens_tri, col="blue")
+points(pointmass_uni$point, pointmass_uni$mass,pch=16)
+points(pointmass_tri$point, pointmass_tri$mass,pch=16,col="blue")
+legend("topleft",col=c("black","blue"),lty=1, 
+       legend=c(paste0("unimodal, loglike=",round(fit_unimodal$loglik)),
+                paste0("trimodal, loglike=",round(fit_trimodal$loglik))))
+```
+
+## Single cell vs single cell data (same individual, two replicates)
+Load data:
+
+```{r}
+load("../data/NA19098.sums.Rda") 
+
+counts_r1 <- NA19098.sums[,1]
+counts_r3 <- NA19098.sums[,2]
+counts <- data.frame(counts_r1, counts_r3)
+counts <- counts[which(rowSums(counts)>0),]
+
+ngenes <- dim(counts)[1]
+counts <- counts %>%
+  mutate(total = counts$counts_r1 + counts$counts_r3) %>%
+  mutate(mn = counts$counts_r1/total)
+head(counts)
+```
+
+Fit unimodal and trimodal ASH: 
+
+```{r,message=FALSE,warning=FALSE}
+# fit unimodal ash
+fit_unimodal <- ash.workhorse(rep(0, ngenes),1,
+                             lik = lik_binom(counts$counts_r1,
+                                             counts$counts_r1+counts$counts_r3), 
+                             mixcompdist = "halfuniform", prior="uniform")
+
+g_uni <- fit_unimodal$fitted_g
+
+# fit trimodal ash
+g_tri <- g_uni
+g_tri$a <- c(0,1,g_tri$a)
+g_tri$b <- c(0,1,g_tri$b)
+g_tri$pi <- rep(1/length(g_tri$a), length(g_tri$a))
+fit_trimodal <- ash.workhorse(rep(0, ngenes), 1,
+                               lik = lik_binom(counts$counts_r1,counts$total),
+                              g=g_tri, prior="uniform")
+g_tri <- fit_trimodal$fitted_g
+```
+
+Compare the fitted unimodal prior and trimodal prior:
+
+```{r}
+x <- seq(0,1,by=0.001)
+dens_uni <- dens_unimix(g_uni, x)
+pointmass_uni <- data.frame(point = g_uni$a[g_uni$a==g_uni$b],
+                        mass = g_uni$pi[g_uni$a==g_uni$b])
+
+dens_tri <- dens_unimix(g_tri, x)
+pointmass_tri <- data.frame(point = g_tri$a[g_tri$a==g_tri$b],
+                        mass = g_tri$pi[g_tri$a==g_tri$b])
+
+plot(x, dens_uni, type="l",ylim=c(0,10),xlab="",ylab="density",
+     main="ASH fitted prior (singlecell, NA19098.r1 vs NA19098.r3)")
+lines(x, dens_tri, col="blue")
+points(pointmass_uni$point, pointmass_uni$mass,pch=16)
+points(pointmass_tri$point, pointmass_tri$mass,pch=16,col="blue")
+legend("topleft",col=c("black","blue"),lty=1, 
+       legend=c(paste0("unimodal, loglike=",round(fit_unimodal$loglik)),
+                paste0("trimodal, loglike=",round(fit_trimodal$loglik))))
+```
+
+## Single cell vs single cell data (two individuals)
+Load data:
+
+```{r}
+load("../data/Two.ind.r1.Rda") 
+
+counts_NA19098 <- Two.ind.r1[,1]
+counts_NA19101 <- Two.ind.r1[,2]
+counts <- data.frame(counts_NA19098, counts_NA19101)
+counts <- counts[which(rowSums(counts)>0),]
+
+ngenes <- dim(counts)[1]
+counts <- counts %>%
+  mutate(total = counts$counts_NA19098 + counts$counts_NA19101) %>%
+  mutate(mn = counts$counts_NA19098/total)
+head(counts)
+```
+
+Fit unimodal and trimodal ASH: 
+
+```{r,message=FALSE,warning=FALSE}
+# fit unimodal ash
+fit_unimodal <- ash.workhorse(rep(0, ngenes),1,
+                             lik = lik_binom(counts$counts_NA19098,
+                                             counts$counts_NA19098+counts$counts_NA19101), 
+                             mixcompdist = "halfuniform", prior="uniform")
+
+g_uni <- fit_unimodal$fitted_g
+
+# fit trimodal ash
+g_tri <- g_uni
+g_tri$a <- c(0,1,g_tri$a)
+g_tri$b <- c(0,1,g_tri$b)
+g_tri$pi <- rep(1/length(g_tri$a), length(g_tri$a))
+fit_trimodal <- ash.workhorse(rep(0, ngenes), 1,
+                               lik = lik_binom(counts$counts_NA19098,counts$total),
+                              g=g_tri, prior="uniform")
+g_tri <- fit_trimodal$fitted_g
+```
+
+Compare the fitted unimodal prior and trimodal prior:
+
+```{r}
+x = seq(0,1,by=0.001)
+dens_uni = dens_unimix(g_uni, x)
+pointmass_uni = data.frame(point = g_uni$a[g_uni$a==g_uni$b],
+                        mass = g_uni$pi[g_uni$a==g_uni$b])
+
+dens_tri = dens_unimix(g_tri, x)
+pointmass_tri = data.frame(point = g_tri$a[g_tri$a==g_tri$b],
+                        mass = g_tri$pi[g_tri$a==g_tri$b])
+
+plot(x, dens_uni, type="l",ylim=c(0,10),xlab="",ylab="density",
+     main="ASH fitted prior (singlecell, NA19098.r1 vs NA19101.r1)")
+lines(x, dens_tri, col="blue")
+points(pointmass_uni$point, pointmass_uni$mass,pch=16)
+points(pointmass_tri$point, pointmass_tri$mass,pch=16,col="blue")
+legend("topleft",col=c("black","blue"),lty=1, 
+       legend=c(paste0("unimodal, loglike=",round(fit_unimodal$loglik)),
+                paste0("trimodal, loglike=",round(fit_trimodal$loglik))))
+```
+
+## Session information
+
+<!-- Insert the session information into the document -->
+```{r session-info}
+```
