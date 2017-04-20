@@ -1,0 +1,532 @@
+<!DOCTYPE html>
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+
+<head>
+
+<meta charset="utf-8" />
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<meta name="generator" content="pandoc" />
+
+
+<meta name="author" content="Mengyin Lu" />
+
+<meta name="date" content="2016-04-15" />
+
+<title>Use general ash to compare single cell datasets</title>
+
+<script src="site_libs/jquery-1.11.3/jquery.min.js"></script>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link href="site_libs/bootstrap-3.3.5/css/cosmo.min.css" rel="stylesheet" />
+<script src="site_libs/bootstrap-3.3.5/js/bootstrap.min.js"></script>
+<script src="site_libs/bootstrap-3.3.5/shim/html5shiv.min.js"></script>
+<script src="site_libs/bootstrap-3.3.5/shim/respond.min.js"></script>
+<script src="site_libs/jqueryui-1.11.4/jquery-ui.min.js"></script>
+<link href="site_libs/tocify-1.9.1/jquery.tocify.css" rel="stylesheet" />
+<script src="site_libs/tocify-1.9.1/jquery.tocify.js"></script>
+<script src="site_libs/navigation-1.1/tabsets.js"></script>
+<link href="site_libs/highlightjs-1.1/textmate.css" rel="stylesheet" />
+<script src="site_libs/highlightjs-1.1/highlight.js"></script>
+<link href="site_libs/font-awesome-4.5.0/css/font-awesome.min.css" rel="stylesheet" />
+
+<style type="text/css">code{white-space: pre;}</style>
+<style type="text/css">
+  pre:not([class]) {
+    background-color: white;
+  }
+</style>
+<script type="text/javascript">
+if (window.hljs && document.readyState && document.readyState === "complete") {
+   window.setTimeout(function() {
+      hljs.initHighlighting();
+   }, 0);
+}
+</script>
+
+
+
+<style type="text/css">
+h1 {
+  font-size: 34px;
+}
+h1.title {
+  font-size: 38px;
+}
+h2 {
+  font-size: 30px;
+}
+h3 {
+  font-size: 24px;
+}
+h4 {
+  font-size: 18px;
+}
+h5 {
+  font-size: 16px;
+}
+h6 {
+  font-size: 12px;
+}
+.table th:not([align]) {
+  text-align: left;
+}
+</style>
+
+
+</head>
+
+<body>
+
+<style type = "text/css">
+.main-container {
+  max-width: 940px;
+  margin-left: auto;
+  margin-right: auto;
+}
+code {
+  color: inherit;
+  background-color: rgba(0, 0, 0, 0.04);
+}
+img {
+  max-width:100%;
+  height: auto;
+}
+.tabbed-pane {
+  padding-top: 12px;
+}
+button.code-folding-btn:focus {
+  outline: none;
+}
+</style>
+
+
+<style type="text/css">
+/* padding for bootstrap navbar */
+body {
+  padding-top: 51px;
+  padding-bottom: 40px;
+}
+/* offset scroll position for anchor links (for fixed navbar)  */
+.section h1 {
+  padding-top: 56px;
+  margin-top: -56px;
+}
+
+.section h2 {
+  padding-top: 56px;
+  margin-top: -56px;
+}
+.section h3 {
+  padding-top: 56px;
+  margin-top: -56px;
+}
+.section h4 {
+  padding-top: 56px;
+  margin-top: -56px;
+}
+.section h5 {
+  padding-top: 56px;
+  margin-top: -56px;
+}
+.section h6 {
+  padding-top: 56px;
+  margin-top: -56px;
+}
+</style>
+
+<script>
+// manage active state of menu based on current page
+$(document).ready(function () {
+  // active menu anchor
+  href = window.location.pathname
+  href = href.substr(href.lastIndexOf('/') + 1)
+  if (href === "")
+    href = "index.html";
+  var menuAnchor = $('a[href="' + href + '"]');
+
+  // mark it active
+  menuAnchor.parent().addClass('active');
+
+  // if it's got a parent navbar menu mark it active as well
+  menuAnchor.closest('li.dropdown').addClass('active');
+});
+</script>
+
+
+<div class="container-fluid main-container">
+
+<!-- tabsets -->
+<script>
+$(document).ready(function () {
+  window.buildTabsets("TOC");
+});
+</script>
+
+<!-- code folding -->
+
+
+
+
+<script>
+$(document).ready(function ()  {
+
+    // move toc-ignore selectors from section div to header
+    $('div.section.toc-ignore')
+        .removeClass('toc-ignore')
+        .children('h1,h2,h3,h4,h5').addClass('toc-ignore');
+
+    // establish options
+    var options = {
+      selectors: "h1,h2,h3",
+      theme: "bootstrap3",
+      context: '.toc-content',
+      hashGenerator: function (text) {
+        return text.replace(/[.\\/?&!#<>]/g, '').replace(/\s/g, '_').toLowerCase();
+      },
+      ignoreSelector: ".toc-ignore",
+      scrollTo: 0
+    };
+    options.showAndHide = true;
+    options.smoothScroll = true;
+
+    // tocify
+    var toc = $("#TOC").tocify(options).data("toc-tocify");
+});
+</script>
+
+<style type="text/css">
+
+#TOC {
+  margin: 25px 0px 20px 0px;
+}
+@media (max-width: 768px) {
+#TOC {
+  position: relative;
+  width: 100%;
+}
+}
+
+
+.toc-content {
+  padding-left: 30px;
+  padding-right: 40px;
+}
+
+div.main-container {
+  max-width: 1200px;
+}
+
+div.tocify {
+  width: 20%;
+  max-width: 260px;
+  max-height: 85%;
+}
+
+@media (min-width: 768px) and (max-width: 991px) {
+  div.tocify {
+    width: 25%;
+  }
+}
+
+@media (max-width: 767px) {
+  div.tocify {
+    width: 100%;
+    max-width: none;
+  }
+}
+
+.tocify ul, .tocify li {
+  line-height: 20px;
+}
+
+.tocify-subheader .tocify-item {
+  font-size: 0.90em;
+  padding-left: 25px;
+  text-indent: 0;
+}
+
+.tocify .list-group-item {
+  border-radius: 0px;
+}
+
+
+</style>
+
+<!-- setup 3col/9col grid for toc_float and main content  -->
+<div class="row-fluid">
+<div class="col-xs-12 col-sm-4 col-md-3">
+<div id="TOC" class="tocify">
+</div>
+</div>
+
+<div class="toc-content col-xs-12 col-sm-8 col-md-9">
+
+
+
+
+<div class="navbar navbar-default  navbar-fixed-top" role="navigation">
+  <div class="container">
+    <div class="navbar-header">
+      <button type="button" class="navbar-toggle collapsed" data-toggle="collapse" data-target="#navbar">
+        <span class="icon-bar"></span>
+        <span class="icon-bar"></span>
+        <span class="icon-bar"></span>
+      </button>
+      <a class="navbar-brand" href="index.html">bulk_single</a>
+    </div>
+    <div id="navbar" class="navbar-collapse collapse">
+      <ul class="nav navbar-nav">
+        <li>
+  <a href="index.html">Home</a>
+</li>
+<li>
+  <a href="about.html">About</a>
+</li>
+<li>
+  <a href="license.html">License</a>
+</li>
+      </ul>
+      <ul class="nav navbar-nav navbar-right">
+        <li>
+  <a href="https://github.com/jdblischak/workflowr">
+    <span class="fa fa-github"></span>
+     
+  </a>
+</li>
+      </ul>
+    </div><!--/.nav-collapse -->
+  </div><!--/.container -->
+</div><!--/.navbar -->
+
+<div class="fluid-row" id="header">
+
+
+
+<h1 class="title toc-ignore">Use general ash to compare single cell datasets</h1>
+<h4 class="author"><em>Mengyin Lu</em></h4>
+<h4 class="date"><em>2016-04-15</em></h4>
+
+</div>
+
+
+<!-- The file analysis/chunks.R contains chunks that define default settings
+shared across the workflowr files. -->
+<!-- Update knitr chunk options -->
+<!-- Insert the date the file was last updated -->
+<p><strong>Last updated:</strong> 2017-04-20</p>
+<!-- Insert the code version (Git commit SHA1) if Git repository exists and R
+ package git2r is installed -->
+<p><strong>Code version:</strong> f725a9a</p>
+<div id="same-individual-compare-two-replicates" class="section level2">
+<h2>Same individual, compare two replicates</h2>
+<pre class="r"><code>library(tidyr)
+library(dplyr)
+
+# Data: individual NA19098, replicate 1 and 3
+load(&quot;../data/NA19098.sums.Rda&quot;) 
+
+# discard genes with 0 count
+counts_r1 = NA19098.sums[,1]
+counts_r3 = NA19098.sums[,2]
+counts = data.frame(counts_r1, counts_r3)
+counts = counts[which(rowSums(counts)&gt;0),]
+head(counts)</code></pre>
+<pre><code>                counts_r1 counts_r3
+ENSG00000237683        24        23
+ENSG00000187634         0         2
+ENSG00000188976       280       242
+ENSG00000187961        12        24
+ENSG00000188290         7         2
+ENSG00000187608       251       182</code></pre>
+<p>Histogram of the ML estimates:</p>
+<pre class="r"><code>library(ggplot2)
+ggplot(data.frame(mn = with(counts, counts_r1/(counts_r1 + counts_r3))),
+       aes(x = mn)) + geom_histogram(bins = 40) + labs(title=&quot;NA19098.r1 vs NA19098.r3&quot;)</code></pre>
+<p><img src="figure/single_single.Rmd/unnamed-chunk-2-1.png" width="672" style="display: block; margin: auto;" /></p>
+<pre class="r"><code>counts$mn &lt;- with(counts, counts$counts_r1/(counts$counts_r1 + counts$counts_r3))</code></pre>
+<p>Compare ASH’s posterior mean vs ML estimates:</p>
+<pre class="r"><code>library(ashr)
+ngenes = dim(counts)[1]
+fit_NA19098 &lt;- ash.workhorse(rep(0, ngenes),1,
+                             lik = lik_binom(counts$counts_r1,
+                                             counts$counts_r1+counts$counts_r3), 
+                             mixcompdist = &quot;halfuniform&quot;)
+
+counts %&gt;% 
+  mutate(posterior_mean = fit_NA19098$result$PosteriorMean,
+         lfsr = fit_NA19098$result$lfsr) %&gt;%
+  ggplot(aes(mn, posterior_mean)) +
+  geom_point(aes(colour = counts_r1), colour = &quot;black&quot;) +
+  geom_vline(xintercept = .5, colour = &quot;blue&quot;, lty = 3) + 
+  geom_hline(yintercept = .5, colour = &quot;blue&quot;, lty = 2) +
+  geom_abline(intercept = 0, slope = 1, colour = &quot;blue&quot;) +
+  labs(x = &quot;ML estimate&quot;, y = &quot;ASH Posterior mean&quot;,
+       title = &quot;NA19098.r1 vs NA19098.r3&quot;) +
+  coord_fixed(ratio = 1) +
+  ylim(c(0,1))</code></pre>
+<p><img src="figure/single_single.Rmd/unnamed-chunk-3-1.png" width="672" style="display: block; margin: auto;" /></p>
+<p>ASH’s fitted prior:</p>
+<pre class="r"><code># plot density of an unimix object g on x
+dens_unimix = function(g, x){
+  sapply(x, dens_unimix_sing, pi=g$pi, a=g$a, b=g$b)
+}
+
+dens_unimix_sing = function(x,pi,a,b){
+  sum((x&gt;=a &amp; x&lt;=b)/(b-a)*pi,na.rm=TRUE)
+}
+
+x = seq(0,1,by=0.001)
+dens = dens_unimix(fit_NA19098$fitted_g, x)
+ggplot(data.frame(x,dens),aes(x, dens)) + 
+  geom_line() + 
+  geom_vline(xintercept=fit_NA19098$fitted_g$a[1],colour=&quot;blue&quot;) +
+  labs(x=&quot;&quot;, y=&quot;density&quot;, title=&quot;ASH fitted prior (NA19098.r1 vs NA19098.r3)&quot;)</code></pre>
+<p><img src="figure/single_single.Rmd/unnamed-chunk-4-1.png" width="672" style="display: block; margin: auto;" /></p>
+</div>
+<div id="two-individuals" class="section level2">
+<h2>Two individuals</h2>
+<pre class="r"><code># Data: individual NA19098 replicate 1 and individual 19101 replicate 1
+load(&quot;../data/Two.ind.r1.Rda&quot;) 
+
+# discard genes with 0 count
+counts_NA19098 = Two.ind.r1[,1]
+counts_NA19101 = Two.ind.r1[,2]
+counts = data.frame(counts_NA19098, counts_NA19101)
+counts = counts[which(rowSums(counts)&gt;0),]
+head(counts)</code></pre>
+<pre><code>                counts_NA19098 counts_NA19101
+ENSG00000237683             24             32
+ENSG00000187634              0              1
+ENSG00000188976            280            206
+ENSG00000187961             12             17
+ENSG00000187583              0              2
+ENSG00000188290              7              4</code></pre>
+<p>Histogram of the ML estimates:</p>
+<pre class="r"><code>library(ggplot2)
+ggplot(data.frame(mn = with(counts, counts_NA19098/(counts_NA19098 + counts_NA19101))),
+       aes(x = mn)) + geom_histogram(bins = 40) + labs(title=&quot;NA19098.r1 vs NA19101.r1&quot;)</code></pre>
+<p><img src="figure/single_single.Rmd/unnamed-chunk-6-1.png" width="672" style="display: block; margin: auto;" /></p>
+<pre class="r"><code>counts$mn &lt;- with(counts, 
+                  counts$counts_NA19098/(counts$counts_NA19098 + counts$counts_NA19101))</code></pre>
+<p>Compare ASH’s posterior mean vs ML estimates:</p>
+<pre class="r"><code>library(ashr)
+ngenes = dim(counts)[1]
+fit_twoind &lt;- ash.workhorse(rep(0, ngenes),1,
+                             lik = lik_binom(counts$counts_NA19098,
+                                             counts$counts_NA19098+counts$counts_NA19101), 
+                             mixcompdist = &quot;halfuniform&quot;)
+
+counts %&gt;% 
+  mutate(posterior_mean = fit_twoind$result$PosteriorMean,
+         lfsr = fit_twoind$result$lfsr) %&gt;%
+  ggplot(aes(mn, posterior_mean)) +
+  geom_point(aes(colour = counts_NA19098), colour = &quot;black&quot;) +
+  geom_vline(xintercept = .5, colour = &quot;blue&quot;, lty = 3) + 
+  geom_hline(yintercept = .5, colour = &quot;blue&quot;, lty = 2) +
+  geom_abline(intercept = 0, slope = 1, colour = &quot;blue&quot;) +
+  labs(x = &quot;ML estimate&quot;, y = &quot;ASH Posterior mean&quot;,
+       title = &quot;NA19098.r1 vs NA19101.r1&quot;) +
+  coord_fixed(ratio = 1) +
+  ylim(c(0,1))</code></pre>
+<p><img src="figure/single_single.Rmd/unnamed-chunk-7-1.png" width="672" style="display: block; margin: auto;" /></p>
+<p>ASH’s fitted prior:</p>
+<pre class="r"><code>x = seq(0,1,by=0.001)
+dens = dens_unimix(fit_twoind$fitted_g, x)
+ggplot(data.frame(x,dens),aes(x, dens)) + 
+  geom_line() + 
+  geom_vline(xintercept=fit_twoind$fitted_g$a[1],colour=&quot;blue&quot;) +
+  labs(x=&quot;&quot;, y=&quot;density&quot;, title=&quot;ASH fitted prior (NA19098.r1 vs NA19101.r1)&quot;)</code></pre>
+<p><img src="figure/single_single.Rmd/unnamed-chunk-8-1.png" width="672" style="display: block; margin: auto;" /></p>
+</div>
+<div id="session-information" class="section level2">
+<h2>Session information</h2>
+<!-- Insert the session information into the document -->
+<pre class="r"><code>sessionInfo()</code></pre>
+<pre><code>R version 3.3.0 (2016-05-03)
+Platform: x86_64-apple-darwin13.4.0 (64-bit)
+Running under: OS X 10.10.5 (Yosemite)
+
+locale:
+[1] en_US.UTF-8/en_US.UTF-8/en_US.UTF-8/C/en_US.UTF-8/en_US.UTF-8
+
+attached base packages:
+[1] stats     graphics  grDevices utils     datasets  methods   base     
+
+other attached packages:
+[1] ashr_2.1-10     ggplot2_2.2.1   dplyr_0.5.0     tidyr_0.6.0    
+[5] workflowr_0.4.0 rmarkdown_1.4   devtools_1.12.0
+
+loaded via a namespace (and not attached):
+ [1] Rcpp_0.12.9       git2r_0.18.0      plyr_1.8.4       
+ [4] iterators_1.0.8   tools_3.3.0       digest_0.6.12    
+ [7] lattice_0.20-34   evaluate_0.10     memoise_1.0.0    
+[10] tibble_1.2        gtable_0.2.0      Matrix_1.2-7.1   
+[13] foreach_1.4.3     DBI_0.5-1         rstudioapi_0.6   
+[16] curl_2.2          yaml_2.1.14       parallel_3.3.0   
+[19] withr_1.0.2       httr_1.2.1        stringr_1.2.0    
+[22] knitr_1.15.1      REBayes_0.68      rprojroot_1.2    
+[25] grid_3.3.0        R6_2.2.0          magrittr_1.5     
+[28] whisker_0.3-2     MASS_7.3-45       backports_1.0.5  
+[31] scales_0.4.1      codetools_0.2-15  htmltools_0.3.5  
+[34] assertthat_0.1    colorspace_1.2-7  labeling_0.3     
+[37] stringi_1.1.2     Rmosek_7.1.2      pscl_1.4.9       
+[40] lazyeval_0.2.0    munsell_0.4.3     doParallel_1.0.10
+[43] truncnorm_1.0-7   SQUAREM_2016.8-2 </code></pre>
+</div>
+
+<hr>
+<p>
+    This <a href="http://rmarkdown.rstudio.com">R Markdown</a> site was created with <a href="https://github.com/jdblischak/workflowr">workflowr</a>
+</p>
+<hr>
+
+<!-- To enable disqus, uncomment the section below and provide your disqus_shortname -->
+
+<!-- disqus
+  <div id="disqus_thread"></div>
+    <script type="text/javascript">
+        /* * * CONFIGURATION VARIABLES: EDIT BEFORE PASTING INTO YOUR WEBPAGE * * */
+        var disqus_shortname = 'rmarkdown'; // required: replace example with your forum shortname
+
+        /* * * DON'T EDIT BELOW THIS LINE * * */
+        (function() {
+            var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+            dsq.src = '//' + disqus_shortname + '.disqus.com/embed.js';
+            (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+        })();
+    </script>
+    <noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+    <a href="http://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+-->
+
+
+</div>
+</div>
+
+</div>
+
+<script>
+
+// add bootstrap table styles to pandoc tables
+function bootstrapStylePandocTables() {
+  $('tr.header').parent('thead').parent('table').addClass('table table-condensed');
+}
+$(document).ready(function () {
+  bootstrapStylePandocTables();
+});
+
+
+</script>
+
+<!-- dynamically load mathjax for compatibility with self-contained -->
+<script>
+  (function () {
+    var script = document.createElement("script");
+    script.type = "text/javascript";
+    script.src  = "https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML";
+    document.getElementsByTagName("head")[0].appendChild(script);
+  })();
+</script>
+
+</body>
+</html>

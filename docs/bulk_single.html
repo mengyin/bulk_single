@@ -1,0 +1,541 @@
+<!DOCTYPE html>
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+
+<head>
+
+<meta charset="utf-8" />
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<meta name="generator" content="pandoc" />
+
+
+
+<meta name="date" content="2016-04-02" />
+
+<title>Bulk versus single cell data</title>
+
+<script src="site_libs/jquery-1.11.3/jquery.min.js"></script>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link href="site_libs/bootstrap-3.3.5/css/cosmo.min.css" rel="stylesheet" />
+<script src="site_libs/bootstrap-3.3.5/js/bootstrap.min.js"></script>
+<script src="site_libs/bootstrap-3.3.5/shim/html5shiv.min.js"></script>
+<script src="site_libs/bootstrap-3.3.5/shim/respond.min.js"></script>
+<script src="site_libs/jqueryui-1.11.4/jquery-ui.min.js"></script>
+<link href="site_libs/tocify-1.9.1/jquery.tocify.css" rel="stylesheet" />
+<script src="site_libs/tocify-1.9.1/jquery.tocify.js"></script>
+<script src="site_libs/navigation-1.1/tabsets.js"></script>
+<link href="site_libs/highlightjs-1.1/textmate.css" rel="stylesheet" />
+<script src="site_libs/highlightjs-1.1/highlight.js"></script>
+<link href="site_libs/font-awesome-4.5.0/css/font-awesome.min.css" rel="stylesheet" />
+
+<style type="text/css">code{white-space: pre;}</style>
+<style type="text/css">
+  pre:not([class]) {
+    background-color: white;
+  }
+</style>
+<script type="text/javascript">
+if (window.hljs && document.readyState && document.readyState === "complete") {
+   window.setTimeout(function() {
+      hljs.initHighlighting();
+   }, 0);
+}
+</script>
+
+
+
+<style type="text/css">
+h1 {
+  font-size: 34px;
+}
+h1.title {
+  font-size: 38px;
+}
+h2 {
+  font-size: 30px;
+}
+h3 {
+  font-size: 24px;
+}
+h4 {
+  font-size: 18px;
+}
+h5 {
+  font-size: 16px;
+}
+h6 {
+  font-size: 12px;
+}
+.table th:not([align]) {
+  text-align: left;
+}
+</style>
+
+
+</head>
+
+<body>
+
+<style type = "text/css">
+.main-container {
+  max-width: 940px;
+  margin-left: auto;
+  margin-right: auto;
+}
+code {
+  color: inherit;
+  background-color: rgba(0, 0, 0, 0.04);
+}
+img {
+  max-width:100%;
+  height: auto;
+}
+.tabbed-pane {
+  padding-top: 12px;
+}
+button.code-folding-btn:focus {
+  outline: none;
+}
+</style>
+
+
+<style type="text/css">
+/* padding for bootstrap navbar */
+body {
+  padding-top: 51px;
+  padding-bottom: 40px;
+}
+/* offset scroll position for anchor links (for fixed navbar)  */
+.section h1 {
+  padding-top: 56px;
+  margin-top: -56px;
+}
+
+.section h2 {
+  padding-top: 56px;
+  margin-top: -56px;
+}
+.section h3 {
+  padding-top: 56px;
+  margin-top: -56px;
+}
+.section h4 {
+  padding-top: 56px;
+  margin-top: -56px;
+}
+.section h5 {
+  padding-top: 56px;
+  margin-top: -56px;
+}
+.section h6 {
+  padding-top: 56px;
+  margin-top: -56px;
+}
+</style>
+
+<script>
+// manage active state of menu based on current page
+$(document).ready(function () {
+  // active menu anchor
+  href = window.location.pathname
+  href = href.substr(href.lastIndexOf('/') + 1)
+  if (href === "")
+    href = "index.html";
+  var menuAnchor = $('a[href="' + href + '"]');
+
+  // mark it active
+  menuAnchor.parent().addClass('active');
+
+  // if it's got a parent navbar menu mark it active as well
+  menuAnchor.closest('li.dropdown').addClass('active');
+});
+</script>
+
+
+<div class="container-fluid main-container">
+
+<!-- tabsets -->
+<script>
+$(document).ready(function () {
+  window.buildTabsets("TOC");
+});
+</script>
+
+<!-- code folding -->
+
+
+
+
+<script>
+$(document).ready(function ()  {
+
+    // move toc-ignore selectors from section div to header
+    $('div.section.toc-ignore')
+        .removeClass('toc-ignore')
+        .children('h1,h2,h3,h4,h5').addClass('toc-ignore');
+
+    // establish options
+    var options = {
+      selectors: "h1,h2,h3",
+      theme: "bootstrap3",
+      context: '.toc-content',
+      hashGenerator: function (text) {
+        return text.replace(/[.\\/?&!#<>]/g, '').replace(/\s/g, '_').toLowerCase();
+      },
+      ignoreSelector: ".toc-ignore",
+      scrollTo: 0
+    };
+    options.showAndHide = true;
+    options.smoothScroll = true;
+
+    // tocify
+    var toc = $("#TOC").tocify(options).data("toc-tocify");
+});
+</script>
+
+<style type="text/css">
+
+#TOC {
+  margin: 25px 0px 20px 0px;
+}
+@media (max-width: 768px) {
+#TOC {
+  position: relative;
+  width: 100%;
+}
+}
+
+
+.toc-content {
+  padding-left: 30px;
+  padding-right: 40px;
+}
+
+div.main-container {
+  max-width: 1200px;
+}
+
+div.tocify {
+  width: 20%;
+  max-width: 260px;
+  max-height: 85%;
+}
+
+@media (min-width: 768px) and (max-width: 991px) {
+  div.tocify {
+    width: 25%;
+  }
+}
+
+@media (max-width: 767px) {
+  div.tocify {
+    width: 100%;
+    max-width: none;
+  }
+}
+
+.tocify ul, .tocify li {
+  line-height: 20px;
+}
+
+.tocify-subheader .tocify-item {
+  font-size: 0.90em;
+  padding-left: 25px;
+  text-indent: 0;
+}
+
+.tocify .list-group-item {
+  border-radius: 0px;
+}
+
+
+</style>
+
+<!-- setup 3col/9col grid for toc_float and main content  -->
+<div class="row-fluid">
+<div class="col-xs-12 col-sm-4 col-md-3">
+<div id="TOC" class="tocify">
+</div>
+</div>
+
+<div class="toc-content col-xs-12 col-sm-8 col-md-9">
+
+
+
+
+<div class="navbar navbar-default  navbar-fixed-top" role="navigation">
+  <div class="container">
+    <div class="navbar-header">
+      <button type="button" class="navbar-toggle collapsed" data-toggle="collapse" data-target="#navbar">
+        <span class="icon-bar"></span>
+        <span class="icon-bar"></span>
+        <span class="icon-bar"></span>
+      </button>
+      <a class="navbar-brand" href="index.html">bulk_single</a>
+    </div>
+    <div id="navbar" class="navbar-collapse collapse">
+      <ul class="nav navbar-nav">
+        <li>
+  <a href="index.html">Home</a>
+</li>
+<li>
+  <a href="about.html">About</a>
+</li>
+<li>
+  <a href="license.html">License</a>
+</li>
+      </ul>
+      <ul class="nav navbar-nav navbar-right">
+        <li>
+  <a href="https://github.com/jdblischak/workflowr">
+    <span class="fa fa-github"></span>
+     
+  </a>
+</li>
+      </ul>
+    </div><!--/.nav-collapse -->
+  </div><!--/.container -->
+</div><!--/.navbar -->
+
+<div class="fluid-row" id="header">
+
+
+
+<h1 class="title toc-ignore">Bulk versus single cell data</h1>
+<h4 class="date"><em>2016-04-02</em></h4>
+
+</div>
+
+
+<!-- The file analysis/chunks.R contains chunks that define default settings
+shared across the workflowr files. -->
+<!-- Update knitr chunk options -->
+<!-- Insert the date the file was last updated -->
+<p><strong>Last updated:</strong> 2017-04-20</p>
+<!-- Insert the code version (Git commit SHA1) if Git repository exists and R
+ package git2r is installed -->
+<p><strong>Code version:</strong> f725a9a</p>
+<div id="outline" class="section level2">
+<h2>Outline</h2>
+<p>The purpose of this document was to perform quantitative assessment of the difference between the counts of gene <span class="math inline">\(g\)</span> in single cell data and the counts of gene <span class="math inline">\(g\)</span> in bulk data. See <a href="https://stephens999.github.io/singlecell-ideas/bulk-vs-single.html">here</a> for Matthew’s formulation of the problem.</p>
+<p>The challenge here is that for each gene <span class="math inline">\(g\)</span>, the total counts <span class="math inline">\(C_g = X_g^s + X_g^b\)</span> may be too big or too small by chance. We apply two approaches that can account for this uncertainty.</p>
+</div>
+<div id="data" class="section level2">
+<h2>Data</h2>
+<p>Loading packages.</p>
+<pre class="r"><code>library(tidyr)
+library(dplyr)</code></pre>
+<p>Import the data before gene/sample filtering. (I copied these data files from our singleCellSeq project directory)</p>
+<pre class="r"><code>anno &lt;- read.table(&quot;../data/annotation.txt&quot;, header = TRUE,
+                   stringsAsFactors = FALSE)
+molecules &lt;- read.table(&quot;../data/molecules.txt&quot;, header = TRUE,
+                    stringsAsFactors = FALSE)
+reads_bulk &lt;- read.table(&quot;../data/reads-bulk.txt&quot;, header = TRUE, stringsAsFactors = FALSE)</code></pre>
+<p>Let’s take one replicate for now.</p>
+<pre class="r"><code>molecules_19101_r1 &lt;- molecules[ ,anno$batch == &quot;NA19101.r1&quot;]
+reads_bulk_19101_r1 &lt;- reads_bulk[ ,grep(&quot;NA19101.r1&quot;, colnames(reads_bulk))]
+# Let&#39;s compute for the single cell data, the counts of gene $g$ across all the individual cells. </code></pre>
+<p>Compute <span class="math inline">\(X_g^{b}\)</span> and <span class="math inline">\(X_g^s\)</span></p>
+<pre class="r"><code>counts_single &lt;- rowSums(molecules_19101_r1)
+counts_bulk &lt;- reads_bulk_19101_r1
+
+all.equal(rownames(counts_bulk), rownames(counts_single))</code></pre>
+<pre><code>[1] TRUE</code></pre>
+<pre class="r"><code>counts &lt;- data.frame(counts_single, counts_bulk)
+counts &lt;- counts[which(rowSums(counts)&gt;0),]
+dim(counts)</code></pre>
+<pre><code>[1] 17429     2</code></pre>
+</div>
+<div id="method-1" class="section level2">
+<h2>Method 1</h2>
+<p>Here I follow the methods in this <a href="http://varianceexplained.org/r/empirical_bayes_baseball/">blog post</a>.</p>
+<p>Plot the ML estimate <span class="math inline">\(\hat{p}_g = X_g^s / (X_g^s + X_g^b)\)</span>.</p>
+<pre class="r"><code>library(ggplot2)
+ggplot(data.frame(mn = with(counts, counts_bulk/(counts_bulk + counts_single))),
+       aes(x = mn)) + geom_histogram(bins = 40)</code></pre>
+<p><img src="figure/bulk_single.Rmd/unnamed-chunk-5-1.png" width="672" style="display: block; margin: auto;" /></p>
+<p>Exclude the outliers to get estimate a beta prior.</p>
+<pre class="r"><code>counts$mn &lt;- with(counts, counts_bulk/(counts_bulk + counts_single))
+
+counts_filtered &lt;- counts %&gt;% 
+  filter(!(mn == 0 | mn == 1))</code></pre>
+<p>Use <code>optim</code> to find beta prior parameters.</p>
+<pre class="r"><code>loglik &lt;- function(mu, x) { 
+    sum(-dbeta(x,mu[1],mu[2],log = TRUE)) 
+    } 
+ 
+fit_optim &lt;- optim(par = c(30,20), fn = loglik,
+                   x = counts_filtered$mn, 
+                   method = &quot;L-BFGS-B&quot;, lower=c(0,0))
+fit_optim</code></pre>
+<pre><code>$par
+[1] 5.436891 1.845051
+
+$value
+[1] -8622.246
+
+$counts
+function gradient 
+      16       16 
+
+$convergence
+[1] 0
+
+$message
+[1] &quot;CONVERGENCE: REL_REDUCTION_OF_F &lt;= FACTR*EPSMCH&quot;</code></pre>
+<pre class="r"><code>ggplot() +
+  geom_histogram(data = counts_filtered, aes(x = mn, y = ..density..), bins = 40) +
+  geom_density(data = data.frame(x = rbeta(100, fit_optim$par[1], fit_optim$par[2])), 
+               aes (x = x), color = &quot;blue&quot;)</code></pre>
+<p><img src="figure/bulk_single.Rmd/unnamed-chunk-7-1.png" width="672" style="display: block; margin: auto;" /></p>
+<p>Compute posterior mean.</p>
+<pre class="r"><code>alpha0 &lt;- fit_optim$par[1]
+beta0 &lt;- fit_optim$par[2]
+counts_eb &lt;- counts_filtered %&gt;%
+  mutate(eb_estimate = (counts_bulk + alpha0)/(counts_single + counts_bulk + alpha0 + beta0))</code></pre>
+<p>Plot estimates.</p>
+<pre class="r"><code>counts_eb %&gt;%
+  ggplot(aes(mn, eb_estimate)) +
+  geom_point(aes(colour = counts_bulk), colour = &quot;black&quot;) +
+  geom_vline(xintercept = .5, colour = &quot;blue&quot;, lty = 3) + 
+  geom_hline(yintercept = .5, colour = &quot;blue&quot;, lty = 2) +
+  geom_abline(intercept = 0, slope = 1, colour = &quot;blue&quot;) +
+  labs(x = &quot;ML estimate&quot;, y = &quot;Posterior mean&quot;,
+       title = &quot;Beta prior, empirical bayes estimate&quot;) +
+  coord_fixed(ratio = 1)</code></pre>
+<p><img src="figure/bulk_single.Rmd/unnamed-chunk-9-1.png" width="672" style="display: block; margin: auto;" /></p>
+</div>
+<div id="method-2-generlized-ash" class="section level2">
+<h2>Method 2: Generlized ash</h2>
+<p>Applying to filtered data</p>
+<pre class="r"><code>ngenes &lt;- dim(counts_filtered)[1]
+counts_filtered &lt;- counts_filtered %&gt;% 
+  mutate(total = counts_single + counts_bulk) %&gt;% 
+  mutate(mn = counts_bulk/total) %&gt;%
+  mutate(se = ngenes*mn*(1-mn))
+
+library(ashr)
+fit_ash_binom &lt;- ash.workhorse(rep(0, ngenes), 
+                               1, 
+                               lik = lik_binom(counts_filtered$counts_bulk, 
+                                               counts_filtered$total),
+                               mixcompdist = &quot;halfuniform&quot;)</code></pre>
+<p>Applying to unfiltered data</p>
+<pre class="r"><code>ngenes &lt;- dim(counts)[1]
+counts &lt;- counts %&gt;%
+  mutate(total = counts_single + counts_bulk) %&gt;%
+  mutate(mn = counts_bulk/total) %&gt;%
+  mutate(se = ngenes*mn*(1-mn))
+
+library(ashr)
+fit_ash_binom &lt;- ash.workhorse(rep(0, ngenes),
+                               1,
+                               lik = lik_binom(counts$counts_bulk,
+                                               counts$total))
+summary(fit_ash_binom$result$PosteriorMean)</code></pre>
+<p>Plot estimates.</p>
+<pre class="r"><code>counts_filtered %&gt;% 
+  mutate(posterior_mean = fit_ash_binom$result$PosteriorMean,
+         lfsr = fit_ash_binom$result$lfsr) %&gt;%
+  ggplot(aes(mn, posterior_mean)) +
+  geom_point(aes(colour = counts_bulk), colour = &quot;black&quot;) +
+  geom_vline(xintercept = .5, colour = &quot;blue&quot;, lty = 3) + 
+  geom_hline(yintercept = .5, colour = &quot;blue&quot;, lty = 2) +
+  geom_abline(intercept = 0, slope = 1, colour = &quot;blue&quot;) +
+  labs(x = &quot;ML estimate&quot;, y = &quot;Posterior mean&quot;,
+       title = &quot;Beta prior, empirical bayes estimate&quot;) +
+  coord_fixed(ratio = 1)</code></pre>
+<p><img src="figure/bulk_single.Rmd/unnamed-chunk-12-1.png" width="672" style="display: block; margin: auto;" /></p>
+</div>
+<div id="session-information" class="section level2">
+<h2>Session information</h2>
+<!-- Insert the session information into the document -->
+<pre class="r"><code>sessionInfo()</code></pre>
+<pre><code>R version 3.3.0 (2016-05-03)
+Platform: x86_64-apple-darwin13.4.0 (64-bit)
+Running under: OS X 10.10.5 (Yosemite)
+
+locale:
+[1] en_US.UTF-8/en_US.UTF-8/en_US.UTF-8/C/en_US.UTF-8/en_US.UTF-8
+
+attached base packages:
+[1] stats     graphics  grDevices utils     datasets  methods   base     
+
+other attached packages:
+[1] ashr_2.1-10     ggplot2_2.2.1   dplyr_0.5.0     tidyr_0.6.0    
+[5] workflowr_0.4.0 rmarkdown_1.4   devtools_1.12.0
+
+loaded via a namespace (and not attached):
+ [1] Rcpp_0.12.9       git2r_0.18.0      plyr_1.8.4       
+ [4] iterators_1.0.8   tools_3.3.0       digest_0.6.12    
+ [7] lattice_0.20-34   evaluate_0.10     memoise_1.0.0    
+[10] tibble_1.2        gtable_0.2.0      Matrix_1.2-7.1   
+[13] foreach_1.4.3     DBI_0.5-1         rstudioapi_0.6   
+[16] curl_2.2          yaml_2.1.14       parallel_3.3.0   
+[19] withr_1.0.2       httr_1.2.1        stringr_1.2.0    
+[22] knitr_1.15.1      REBayes_0.68      rprojroot_1.2    
+[25] grid_3.3.0        R6_2.2.0          magrittr_1.5     
+[28] whisker_0.3-2     MASS_7.3-45       backports_1.0.5  
+[31] scales_0.4.1      codetools_0.2-15  htmltools_0.3.5  
+[34] assertthat_0.1    colorspace_1.2-7  labeling_0.3     
+[37] stringi_1.1.2     Rmosek_7.1.2      pscl_1.4.9       
+[40] lazyeval_0.2.0    munsell_0.4.3     doParallel_1.0.10
+[43] truncnorm_1.0-7   SQUAREM_2016.8-2 </code></pre>
+</div>
+
+<hr>
+<p>
+    This <a href="http://rmarkdown.rstudio.com">R Markdown</a> site was created with <a href="https://github.com/jdblischak/workflowr">workflowr</a>
+</p>
+<hr>
+
+<!-- To enable disqus, uncomment the section below and provide your disqus_shortname -->
+
+<!-- disqus
+  <div id="disqus_thread"></div>
+    <script type="text/javascript">
+        /* * * CONFIGURATION VARIABLES: EDIT BEFORE PASTING INTO YOUR WEBPAGE * * */
+        var disqus_shortname = 'rmarkdown'; // required: replace example with your forum shortname
+
+        /* * * DON'T EDIT BELOW THIS LINE * * */
+        (function() {
+            var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+            dsq.src = '//' + disqus_shortname + '.disqus.com/embed.js';
+            (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+        })();
+    </script>
+    <noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+    <a href="http://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+-->
+
+
+</div>
+</div>
+
+</div>
+
+<script>
+
+// add bootstrap table styles to pandoc tables
+function bootstrapStylePandocTables() {
+  $('tr.header').parent('thead').parent('table').addClass('table table-condensed');
+}
+$(document).ready(function () {
+  bootstrapStylePandocTables();
+});
+
+
+</script>
+
+<!-- dynamically load mathjax for compatibility with self-contained -->
+<script>
+  (function () {
+    var script = document.createElement("script");
+    script.type = "text/javascript";
+    script.src  = "https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML";
+    document.getElementsByTagName("head")[0].appendChild(script);
+  })();
+</script>
+
+</body>
+</html>
