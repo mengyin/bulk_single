@@ -311,10 +311,10 @@ div.tocify {
 shared across the workflowr files. -->
 <!-- Update knitr chunk options -->
 <!-- Insert the date the file was last updated -->
-<p><strong>Last updated:</strong> 2017-04-20</p>
+<p><strong>Last updated:</strong> 2017-04-21</p>
 <!-- Insert the code version (Git commit SHA1) if Git repository exists and R
  package git2r is installed -->
-<p><strong>Code version:</strong> f725a9a</p>
+<p><strong>Code version:</strong> 355abbe</p>
 <div id="outline" class="section level2">
 <h2>Outline</h2>
 <p>The purpose of this document was to perform quantitative assessment of the difference between the counts of gene <span class="math inline">\(g\)</span> in single cell data and the counts of gene <span class="math inline">\(g\)</span> in bulk data. See <a href="https://stephens999.github.io/singlecell-ideas/bulk-vs-single.html">here</a> for Matthew’s formulation of the problem.</p>
@@ -342,6 +342,7 @@ counts_bulk &lt;- reads_bulk_19101_r1
 all.equal(rownames(counts_bulk), rownames(counts_single))</code></pre>
 <pre><code>[1] TRUE</code></pre>
 <pre class="r"><code>counts &lt;- data.frame(counts_single, counts_bulk)
+row.names(counts) &lt;- row.names(molecules_19101_r1)
 counts &lt;- counts[which(rowSums(counts)&gt;0),]
 dim(counts)</code></pre>
 <pre><code>[1] 17429     2</code></pre>
@@ -353,7 +354,7 @@ dim(counts)</code></pre>
 <pre class="r"><code>library(ggplot2)
 ggplot(data.frame(mn = with(counts, counts_bulk/(counts_bulk + counts_single))),
        aes(x = mn)) + geom_histogram(bins = 40)</code></pre>
-<p><img src="figure/bulk_single.Rmd/unnamed-chunk-5-1.png" width="672" style="display: block; margin: auto;" /></p>
+<p><img src="figure/bulk_single.Rmd/unnamed-chunk-37-1.png" width="672" style="display: block; margin: auto;" /></p>
 <p>Exclude the outliers to get estimate a beta prior.</p>
 <pre class="r"><code>counts$mn &lt;- with(counts, counts_bulk/(counts_bulk + counts_single))
 
@@ -387,7 +388,7 @@ $message
   geom_histogram(data = counts_filtered, aes(x = mn, y = ..density..), bins = 40) +
   geom_density(data = data.frame(x = rbeta(100, fit_optim$par[1], fit_optim$par[2])), 
                aes (x = x), color = &quot;blue&quot;)</code></pre>
-<p><img src="figure/bulk_single.Rmd/unnamed-chunk-7-1.png" width="672" style="display: block; margin: auto;" /></p>
+<p><img src="figure/bulk_single.Rmd/unnamed-chunk-39-1.png" width="672" style="display: block; margin: auto;" /></p>
 <p>Compute posterior mean.</p>
 <pre class="r"><code>alpha0 &lt;- fit_optim$par[1]
 beta0 &lt;- fit_optim$par[2]
@@ -403,7 +404,7 @@ counts_eb &lt;- counts_filtered %&gt;%
   labs(x = &quot;ML estimate&quot;, y = &quot;Posterior mean&quot;,
        title = &quot;Beta prior, empirical bayes estimate&quot;) +
   coord_fixed(ratio = 1)</code></pre>
-<p><img src="figure/bulk_single.Rmd/unnamed-chunk-9-1.png" width="672" style="display: block; margin: auto;" /></p>
+<p><img src="figure/bulk_single.Rmd/unnamed-chunk-41-1.png" width="672" style="display: block; margin: auto;" /></p>
 </div>
 <div id="method-2-generlized-ash" class="section level2">
 <h2>Method 2: Generlized ash</h2>
@@ -411,32 +412,50 @@ counts_eb &lt;- counts_filtered %&gt;%
 <pre class="r"><code>ngenes &lt;- dim(counts_filtered)[1]
 counts_filtered &lt;- counts_filtered %&gt;% 
   mutate(total = counts_single + counts_bulk) %&gt;% 
-  mutate(mn = counts_bulk/total) %&gt;%
-  mutate(se = ngenes*mn*(1-mn))
+  mutate(mn = counts_bulk/total) 
 
 library(ashr)
-fit_ash_binom &lt;- ash.workhorse(rep(0, ngenes), 
+fit_filter &lt;- ash.workhorse(rep(0, ngenes), 
                                1, 
                                lik = lik_binom(counts_filtered$counts_bulk, 
                                                counts_filtered$total),
                                mixcompdist = &quot;halfuniform&quot;)</code></pre>
 <p>Applying to unfiltered data</p>
 <pre class="r"><code>ngenes &lt;- dim(counts)[1]
-counts &lt;- counts %&gt;%
-  mutate(total = counts_single + counts_bulk) %&gt;%
-  mutate(mn = counts_bulk/total) %&gt;%
-  mutate(se = ngenes*mn*(1-mn))
+counts$total &lt;- counts$counts_single+counts$counts_bulk
 
 library(ashr)
-fit_ash_binom &lt;- ash.workhorse(rep(0, ngenes),
-                               1,
-                               lik = lik_binom(counts$counts_bulk,
-                                               counts$total))
-summary(fit_ash_binom$result$PosteriorMean)</code></pre>
+fit_unfilter &lt;- ash.workhorse(rep(0, ngenes), 1,
+                              lik = lik_binom(counts$counts_bulk,counts$total),
+                              mixcompdist = &quot;halfuniform&quot;, prior=&quot;uniform&quot;)
+summary(fit_unfilter$result$PosteriorMean)</code></pre>
+<pre><code>   Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
+0.01087 0.71280 0.79500 0.75710 0.85270 0.99330 </code></pre>
+<p>Fitted prior density:</p>
+<pre class="r"><code># plot density of an unimix object g on x
+dens_unimix = function(g, x){
+  sapply(x, dens_unimix_sing, pi=g$pi, a=g$a, b=g$b)
+}
+
+dens_unimix_sing = function(x,pi,a,b){
+  sum((x&gt;=a &amp; x&lt;b)/(b-a)*pi,na.rm=TRUE)
+}
+
+x &lt;- seq(0,1,by=0.001)
+g &lt;- fit_unfilter$fitted_g
+dens_uni &lt;- dens_unimix(g, x)
+pointmass &lt;- data.frame(point = g$a[g$a==g$b],
+                        mass = g$pi[g$a==g$b])
+
+plot(x, dens_uni, type=&quot;l&quot;,xlab=&quot;&quot;,ylab=&quot;density&quot;,
+     main=&quot;ASH fitted prior (singlecell vs bulk)&quot;)
+abline(v=g$a[1],col=2,lty=2)</code></pre>
+<p><img src="figure/bulk_single.Rmd/unnamed-chunk-44-1.png" width="672" style="display: block; margin: auto;" /></p>
+<p>Prior mode: 0.7517678.</p>
 <p>Plot estimates.</p>
-<pre class="r"><code>counts_filtered %&gt;% 
-  mutate(posterior_mean = fit_ash_binom$result$PosteriorMean,
-         lfsr = fit_ash_binom$result$lfsr) %&gt;%
+<pre class="r"><code>counts %&gt;% 
+  mutate(posterior_mean = fit_unfilter$result$PosteriorMean,
+         lfsr = fit_unfilter$result$lfsr) %&gt;%
   ggplot(aes(mn, posterior_mean)) +
   geom_point(aes(colour = counts_bulk), colour = &quot;black&quot;) +
   geom_vline(xintercept = .5, colour = &quot;blue&quot;, lty = 3) + 
@@ -445,7 +464,56 @@ summary(fit_ash_binom$result$PosteriorMean)</code></pre>
   labs(x = &quot;ML estimate&quot;, y = &quot;Posterior mean&quot;,
        title = &quot;Beta prior, empirical bayes estimate&quot;) +
   coord_fixed(ratio = 1)</code></pre>
-<p><img src="figure/bulk_single.Rmd/unnamed-chunk-12-1.png" width="672" style="display: block; margin: auto;" /></p>
+<p><img src="figure/bulk_single.Rmd/unnamed-chunk-45-1.png" width="672" style="display: block; margin: auto;" /></p>
+<p>Genes with smallest/largest posterior mean:</p>
+<pre class="r"><code>counts$postmean &lt;- fit_unfilter$result$PosteriorMean
+
+# genes with smallest posterior mean
+counts[order(counts$postmean)[1:20],]</code></pre>
+<pre><code>                counts_single counts_bulk         mn total   postmean
+ENSG00000171532            90           0 0.00000000    90 0.01086957
+ENSG00000256892            52           0 0.00000000    52 0.01851852
+ENSG00000162825            50           0 0.00000000    50 0.01923077
+ERCC-00078                 50           0 0.00000000    50 0.01923077
+ERCC-00095                137           2 0.01438849   139 0.02127660
+ERCC-00059                 82           1 0.01204819    83 0.02352941
+ENSG00000182463            64           1 0.01538462    65 0.02985075
+ENSG00000198558           144           4 0.02702703   148 0.03333333
+ENSG00000270672           433          16 0.03563474   449 0.03769401
+ENSG00000121318            21           0 0.00000000    21 0.04347836
+ERCC-00170                 21           0 0.00000000    21 0.04347836
+ERCC-00112                280          12 0.04109589   292 0.04421769
+ENSG00000256222           193           8 0.03980100   201 0.04433498
+ENSG00000144962            20           0 0.00000000    20 0.04545474
+ENSG00000270394            20           0 0.00000000    20 0.04545474
+ENSG00000232196            60           2 0.03225806    62 0.04687500
+ENSG00000256045           930          45 0.04615385   975 0.04708291
+ERCC-00109                 19           0 0.00000000    19 0.04761944
+ENSG00000270188           135           6 0.04255319   141 0.04895105
+ERCC-00171               2120         112 0.05017921  2232 0.05058192</code></pre>
+<pre class="r"><code># genes with largest posterior mean
+counts[order(counts$postmean,decreasing=TRUE)[1:20],]</code></pre>
+<pre><code>                counts_single counts_bulk        mn  total  postmean
+ENSG00000241978             0         149 1.0000000    149 0.9932578
+ENSG00000144476             0         109 1.0000000    109 0.9895842
+ENSG00000248098            23        1547 0.9853503   1570 0.9847328
+ENSG00000146955             3         241 0.9877049    244 0.9835343
+ENSG00000125730             3         223 0.9867257    226 0.9819597
+ENSG00000257594             0          80 1.0000000     80 0.9801518
+ENSG00000167774             9         389 0.9773869    398 0.9747382
+ENSG00000258947           110        4264 0.9748514   4374 0.9746344
+ENSG00000126218             0          69 1.0000000     69 0.9723757
+ENSG00000258659             0          66 1.0000000     66 0.9696680
+ENSG00000069535             0          63 1.0000000     63 0.9666960
+ENSG00000104835            48        1404 0.9669421   1452 0.9662989
+ENSG00000087086         12709      344971 0.9644682 357680 0.9644656
+ENSG00000110195             2         123 0.9840000    125 0.9639481
+ENSG00000111669          6204      163570 0.9634573 169774 0.9634518
+ENSG00000170439             4         177 0.9779006    181 0.9634143
+ENSG00000125841            78        2041 0.9631902   2119 0.9627530
+ENSG00000143344             3         148 0.9801325    151 0.9623702
+ENSG00000182326            14         418 0.9675926    432 0.9619013
+ENSG00000052344           210        5264 0.9616368   5474 0.9614682</code></pre>
 </div>
 <div id="session-information" class="section level2">
 <h2>Session information</h2>
