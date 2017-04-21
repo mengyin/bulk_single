@@ -66,6 +66,7 @@ counts_bulk <- reads_bulk_19101_r1
 all.equal(rownames(counts_bulk), rownames(counts_single))
 
 counts <- data.frame(counts_single, counts_bulk)
+row.names(counts) <- row.names(molecules_19101_r1)
 counts <- counts[which(rowSums(counts)>0),]
 dim(counts)
 ```
@@ -138,15 +139,14 @@ counts_eb %>%
 
 Applying to filtered data
 
-```{r}
+```{r,eval=FALSE}
 ngenes <- dim(counts_filtered)[1]
 counts_filtered <- counts_filtered %>% 
   mutate(total = counts_single + counts_bulk) %>% 
-  mutate(mn = counts_bulk/total) %>%
-  mutate(se = ngenes*mn*(1-mn))
+  mutate(mn = counts_bulk/total) 
 
 library(ashr)
-fit_ash_binom <- ash.workhorse(rep(0, ngenes), 
+fit_filter <- ash.workhorse(rep(0, ngenes), 
                                1, 
                                lik = lik_binom(counts_filtered$counts_bulk, 
                                                counts_filtered$total),
@@ -156,27 +156,48 @@ fit_ash_binom <- ash.workhorse(rep(0, ngenes),
 
 Applying to unfiltered data
 
-```{r,eval=FALSE}
+```{r,message=FALSE,warning=FALSE}
 ngenes <- dim(counts)[1]
-counts <- counts %>%
-  mutate(total = counts_single + counts_bulk) %>%
-  mutate(mn = counts_bulk/total) %>%
-  mutate(se = ngenes*mn*(1-mn))
+counts$total <- counts$counts_single+counts$counts_bulk
 
 library(ashr)
-fit_ash_binom <- ash.workhorse(rep(0, ngenes),
-                               1,
-                               lik = lik_binom(counts$counts_bulk,
-                                               counts$total))
-summary(fit_ash_binom$result$PosteriorMean)
+fit_unfilter <- ash.workhorse(rep(0, ngenes), 1,
+                              lik = lik_binom(counts$counts_bulk,counts$total),
+                              mixcompdist = "halfuniform", prior="uniform")
+summary(fit_unfilter$result$PosteriorMean)
 ```
+
+Fitted prior density:
+
+```{r}
+# plot density of an unimix object g on x
+dens_unimix = function(g, x){
+  sapply(x, dens_unimix_sing, pi=g$pi, a=g$a, b=g$b)
+}
+
+dens_unimix_sing = function(x,pi,a,b){
+  sum((x>=a & x<b)/(b-a)*pi,na.rm=TRUE)
+}
+
+x <- seq(0,1,by=0.001)
+g <- fit_unfilter$fitted_g
+dens_uni <- dens_unimix(g, x)
+pointmass <- data.frame(point = g$a[g$a==g$b],
+                        mass = g$pi[g$a==g$b])
+
+plot(x, dens_uni, type="l",xlab="",ylab="density",
+     main="ASH fitted prior (singlecell vs bulk)")
+abline(v=g$a[1],col=2,lty=2)
+```
+
+Prior mode: `r g$a[1]`.
 
 Plot estimates.
 
 ```{r}
-counts_filtered %>% 
-  mutate(posterior_mean = fit_ash_binom$result$PosteriorMean,
-         lfsr = fit_ash_binom$result$lfsr) %>%
+counts %>% 
+  mutate(posterior_mean = fit_unfilter$result$PosteriorMean,
+         lfsr = fit_unfilter$result$lfsr) %>%
   ggplot(aes(mn, posterior_mean)) +
   geom_point(aes(colour = counts_bulk), colour = "black") +
   geom_vline(xintercept = .5, colour = "blue", lty = 3) + 
@@ -187,6 +208,16 @@ counts_filtered %>%
   coord_fixed(ratio = 1)
 ```
 
+Genes with smallest/largest posterior mean:
+```{r}
+counts$postmean <- fit_unfilter$result$PosteriorMean
+
+# genes with smallest posterior mean
+counts[order(counts$postmean)[1:20],]
+
+# genes with largest posterior mean
+counts[order(counts$postmean,decreasing=TRUE)[1:20],]
+```
 
 ## Session information
 
